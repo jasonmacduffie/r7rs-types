@@ -131,11 +131,20 @@
     (if (procedure-type? applyer) ;; TODO: check arguments
         (if (arguments-match? applyer applied)
             (list-ref (type-params applyer) 2)
-            (error "check-list" "TYPE CHECK FAILURE"))
+            (error "check-list" "Argument type mismatch"))
         (error "check-list" "Non-procedure application" applyer))))
 
 (define (arguments-match? proc-type args)
   (let ((variadic? (list-ref (type-params proc-type) 3)))
+    (let ((proc-size (length (list-ref (type-params proc-type) 1)))
+          (args-size (length args)))
+      (when (and variadic?
+                 (> (- proc-size 1) args-size))
+        (error "arguments-match?" "Expected at least "
+               (- proc-size 1) " arguments, got " args-size))
+      (unless (or variadic? (= proc-size args-size))
+        (error "arguments-match?" "Expected " proc-size
+               "arguments, got " args-size)))
     (let loop ((proc-in (list-ref (type-params proc-type) 1))
                (args-in args))
       (let ((checking-variadic? (and variadic? (= (length proc-in) 1))))
@@ -148,7 +157,10 @@
                               proc-in
                               (cdr proc-in))
                           (cdr args-in))
-                    #f)))))))
+                      (error "Expected "
+                        (type-repr (car proc-in))
+                        ", but got "
+                        (type-repr (car args-in))))))))))
 
 (define (check-global-expression expr)
   (check-expression expr global-context))
