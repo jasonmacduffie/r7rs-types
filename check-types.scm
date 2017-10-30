@@ -92,7 +92,13 @@
   `((* . ,(procedure-of (list number-type number-type)
                        number-type
                        #t))
+    (/ . ,(procedure-of (list number-type number-type)
+                        number-type
+                        #t))
     (+ . ,(procedure-of (list number-type)
+                        number-type
+                        #t))
+    (- . ,(procedure-of (list number-type)
                         number-type
                         #t))))
 
