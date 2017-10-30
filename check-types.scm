@@ -129,8 +129,26 @@
         (applied (map (lambda (e) (check-expression e context))
                       (cdr expr))))
     (if (procedure-type? applyer) ;; TODO: check arguments
-        (list-ref (type-params applyer) 2)
+        (if (arguments-match? applyer applied)
+            (list-ref (type-params applyer) 2)
+            (error "check-list" "TYPE CHECK FAILURE"))
         (error "check-list" "Non-procedure application" applyer))))
+
+(define (arguments-match? proc-type args)
+  (let ((variadic? (list-ref (type-params proc-type) 3)))
+    (let loop ((proc-in (list-ref (type-params proc-type) 1))
+               (args-in args))
+      (let ((checking-variadic? (and variadic? (= (length proc-in) 1))))
+        (if (null? args-in)
+            (or checking-variadic? (null? proc-in))
+            (if (null? proc-in)
+                #f
+                (if (type=? (car proc-in) (car args-in))
+                    (loop (if checking-variadic?
+                              proc-in
+                              (cdr proc-in))
+                          (cdr args-in))
+                    #f)))))))
 
 (define (check-global-expression expr)
   (check-expression expr global-context))
