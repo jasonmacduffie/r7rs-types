@@ -13,6 +13,20 @@
   (parameters type-params)
   (union-of type-union))
 
+(define fundamental-syntax
+  ;; I assume you do not override these fundamental syntax forms, and
+  ;; that these forms are indeed imported. If you are using a language
+  ;; besides (scheme base) this checker will not work.
+  ;;
+  ;; All other syntax forms must be pre-expanded in order for type checking
+  ;; to work.
+  '(define begin lambda if case cond or and let))
+
+(define (syntax-form? l)
+  (if (memq (car l) fundamental-syntax)
+      #t
+      #f))
+
 (define (warn-any)
   (display "Any type was found")
   (newline))
@@ -131,14 +145,28 @@
     (error "check-expression" "Not implemented for " expr))))
 
 (define (check-list expr context)
-  (let ((applyer (check-expression (car expr) context))
-        (applied (map (lambda (e) (check-expression e context))
-                      (cdr expr))))
-    (if (procedure-type? applyer) ;; TODO: check arguments
-        (if (arguments-match? applyer applied)
-            (list-ref (type-params applyer) 2)
-            (error "check-list" "Argument type mismatch"))
-        (error "check-list" "Non-procedure application" applyer))))
+  (if (syntax-form? expr)
+      (check-syntax-form expr context)
+      (let ((applyer (check-expression (car expr) context))
+            (applied (map (lambda (e) (check-expression e context))
+                          (cdr expr))))
+        (if (procedure-type? applyer) ;; TODO: check arguments
+            (if (arguments-match? applyer applied)
+                (list-ref (type-params applyer) 2)
+                (error "check-list" "Argument type mismatch"))
+            (error "check-list" "Non-procedure application" applyer)))))
+
+(define (check-syntax-form expr context)
+  (cond
+   ((eq? (car expr) 'begin)
+    (if (null? (cdr expr))
+        undefined-type
+        (step-through (cdr expr) context)))
+   (else (error "check-syntax-form" "Not yet implemented" (car expr)))))
+
+(define (step-through exprs context)
+  ;; TODO: step through a list of expressions given a context
+  0)
 
 (define (arguments-match? proc-type args)
   (let ((variadic? (list-ref (type-params proc-type) 3)))
@@ -170,5 +198,4 @@
 
 (define (check-global-expression expr)
   (check-expression expr global-context))
-
 

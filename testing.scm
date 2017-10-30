@@ -10,5 +10,8 @@
 (load "./check-types.scm")
 
 (check-global-expression
- '(* 3 4 5))
+ '(begin
+    (define x 3)
+    (display x)
+    x))
 
