@@ -7,10 +7,10 @@
   (scheme write))
 
 (define-record-type <type>
-  (make-type parameters representation union-of)
+  (make-type representation parameters union-of)
   type?
-  (parameters type-params)
   (representation type-repr)
+  (parameters type-params)
   (union-of type-union))
 
 (define (warn-any)
@@ -50,20 +50,89 @@
   (if (type-params t) #t #f))
 
 (define any-type (make-type "#<any>" #f #f))
+(define undefined-type (make-type "#<undefined>" #f #f))
 (define number-type (make-type "#<number>" #f #f))
+(define boolean-type (make-type "#<boolean>" #f #f))
 (define char-type (make-type "#<char>" #f #f))
 (define string-type (make-type "#<string>" #f #f))
 (define null-type (make-type "#<null>" #f #f))
 (define (vector-of t)
   (make-type (string-append "#<vector-of " (type-repr t) ">") (list vector-of t) #f))
 (define (pair-of a b)
-  (make-type (string-append "#<pair-of (" (type-repr a) ")x(" (type-repr b) ")>" (list pair-of a b) #f)))
+  (make-type (string-append "#<pair-of (" (type-repr a) ")x(" (type-repr b) ")>") (list pair-of a b) #f))
 (define (list-of t)
   (pair-of t any-type))
-;;  (make-type (string-append "#<list-of " (type-repr t) 
-;;  (make-type (list t) (string-append "#<list-of " (type-repr t) ">")
+(define (procedure-of input-types output-type variadic?)
+  (make-type (string-append "#<procedure: ("
+                            (apply string-append
+                             (map (lambda (s)
+                                    (string-append (type-repr s)
+                                                   " "))
+                                  (if variadic?
+                                      (reverse (cdr (reverse input-types)))
+                                      input-types)))
+                            (if variadic?
+                                (string-append " . ("
+                                               (type-repr (car (reverse input-types)))
+                                               ")")
+                                "")
+                            ") -> "
+                            (type-repr output-type)
+                            ">")
+             (list procedure-of input-types output-type variadic?)
+             #f))
 
+(define (procedure-type? t)
+  (and (type? t)
+       (parameterized-type? t)
+       (eq? (car (type-params t)) procedure-of)))
 
+(define global-context
+  ;; This has the type signature of built-in functions
+  `((* . ,(procedure-of (list number-type number-type)
+                       number-type
+                       #t))
+    (+ . ,(procedure-of (list number-type)
+                        number-type
+                        #t))))
 
-;;(define (check-expression
+(define (check-expression expr context)
+  ;; Returns the type of expr. If a type error is found,
+  ;; raise an error.
+  (cond
+   ((pair? expr)
+    (if (list? expr)
+        (check-list expr context)
+        (error "check-expression" "Improper list cannot be evaluated")))
+   ((null? expr)
+    (error "check-expression" "Null cannot be evaluated"))
+   ((number? expr)
+    number-type)
+   ((boolean? expr)
+    boolean-type)
+   ((char? expr)
+    char-type)
+   ((string? expr)
+    string-type)
+   ((vector? expr)
+    (check-vector expr))
+   ((symbol? expr)
+    (let ((result (assq expr context)))
+      (if result
+          (cdr result)
+          (error "check-expression" "No context for symbol" expr))))
+   (else
+    (error "check-expression" "Not implemented for " expr))))
+
+(define (check-list expr context)
+  (let ((applyer (check-expression (car expr) context))
+        (applied (map (lambda (e) (check-expression e context))
+                      (cdr expr))))
+    (if (procedure-type? applyer) ;; TODO: check arguments
+        (list-ref (type-params applyer) 2)
+        (error "check-list" "Non-procedure application" applyer))))
+
+(define (check-global-expression expr)
+  (check-expression expr global-context))
+
 
