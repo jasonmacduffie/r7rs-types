@@ -20,7 +20,7 @@
   ;;
   ;; All other syntax forms must be pre-expanded in order for type checking
   ;; to work.
-  '(define begin lambda if case cond or and let))
+  '(define begin quote lambda if case cond or and let))
 
 (define (syntax-form? l)
   (if (memq (car l) fundamental-syntax)
@@ -64,13 +64,14 @@
 (define boolean-type (make-type "#<boolean>" #f))
 (define char-type (make-type "#<char>" #f))
 (define string-type (make-type "#<string>" #f))
-(define null-type (make-type "#<null>" #f))
 (define (vector-of t)
   (make-type (string-append "#<vector-of " (type-repr t) ">") (list vector-of t)))
 (define (pair-of a b)
   (make-type (string-append "#<pair-of (" (type-repr a) ")x(" (type-repr b) ")>") (list pair-of a b)))
 (define (list-of t)
-  (pair-of t any-type))
+  ;; Note that the list type is disjoint from the pair type.
+  ;; This is necessary because we cannot make a union of null and pair.
+  (make-type (string-append "#<list-of (" (type-repr t) ">") (list list-of t)))
 (define (procedure-of input-types output-type variadic?)
   (make-type (string-append "#<procedure: ("
                             (apply string-append
@@ -154,7 +155,32 @@
   (cond
    ((eq? (car expr) 'begin)
     (step-through (cdr expr) context))
+   ((eq? (car expr) 'quote)
+    (if (= (length expr) 2)
+        (check-quoted-expression (cadr expr))
+        (error "check-syntax-form" "malformed quote" expr)))
    (else (error "check-syntax-form" "Not yet implemented" (car expr)))))
+
+(define (check-quoted-expression expr)
+  (cond
+   ((list? expr)
+    (if (null? expr)
+      any-type
+      (let loop ((in (cddr expr))
+                 (prev-type (check-quoted-expression (cadr expr))))
+        (if (null? in)
+            prev-type
+            (if (type=? prev-type (check-quoted-expression (car in)))
+                (loop (cdr in) prev-type)
+                any-type)))))
+
+   ((pair? expr)
+    (pair-of (check-quoted-expression (car expr))
+             (check-quoted-expression (cdr expr))))
+   ((symbol? expr)
+    symbol-type)
+   (else
+    (check-expression expr '()))))
 
 (define (step-through exprs context)
   (if (null? exprs)
