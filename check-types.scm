@@ -8,11 +8,10 @@
   (scheme cxr))
 
 (define-record-type <type>
-  (make-type representation parameters union-of)
+  (make-type representation parameters)
   type?
   (representation type-repr)
-  (parameters type-params)
-  (union-of type-union))
+  (parameters type-params))
 
 (define fundamental-syntax
   ;; I assume you do not override these fundamental syntax forms, and
@@ -40,8 +39,6 @@
         (eq? b any-type))
     (warn-any)
     #t)
-   ((or (union-type? a) (union-type? b))
-    #t) ;; TODO: implement union type checking
    ((parameterized-type? a)
     (if (parameterized-type? b)
         (if (eq? (car (type-params a))
@@ -58,23 +55,20 @@
    (else
     (eq? a b))))
 
-(define (union-type? t)
-  (if (type-union t) #t #f))
-
 (define (parameterized-type? t)
   (if (type-params t) #t #f))
 
-(define any-type (make-type "#<any>" #f #f))
-(define undefined-type (make-type "#<undefined>" #f #f))
-(define number-type (make-type "#<number>" #f #f))
-(define boolean-type (make-type "#<boolean>" #f #f))
-(define char-type (make-type "#<char>" #f #f))
-(define string-type (make-type "#<string>" #f #f))
-(define null-type (make-type "#<null>" #f #f))
+(define any-type (make-type "#<any>" #f))
+(define undefined-type (make-type "#<undefined>" #f))
+(define number-type (make-type "#<number>" #f))
+(define boolean-type (make-type "#<boolean>" #f))
+(define char-type (make-type "#<char>" #f))
+(define string-type (make-type "#<string>" #f))
+(define null-type (make-type "#<null>" #f))
 (define (vector-of t)
-  (make-type (string-append "#<vector-of " (type-repr t) ">") (list vector-of t) #f))
+  (make-type (string-append "#<vector-of " (type-repr t) ">") (list vector-of t)))
 (define (pair-of a b)
-  (make-type (string-append "#<pair-of (" (type-repr a) ")x(" (type-repr b) ")>") (list pair-of a b) #f))
+  (make-type (string-append "#<pair-of (" (type-repr a) ")x(" (type-repr b) ")>") (list pair-of a b)))
 (define (list-of t)
   (pair-of t any-type))
 (define (procedure-of input-types output-type variadic?)
@@ -94,8 +88,7 @@
                             ") -> "
                             (type-repr output-type)
                             ">")
-             (list procedure-of input-types output-type variadic?)
-             #f))
+             (list procedure-of input-types output-type variadic?)))
 
 (define (procedure-type? t)
   (and (type? t)
