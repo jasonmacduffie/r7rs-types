@@ -9,7 +9,7 @@
 
 (load "./check-types.scm")
 
-(check-global-expression
+(display-type
  '(begin
     (define x 3)
     (display x)

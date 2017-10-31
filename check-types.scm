@@ -4,7 +4,8 @@
 (import
   (scheme base)
   (scheme read)
-  (scheme write))
+  (scheme write)
+  (scheme cxr))
 
 (define-record-type <type>
   (make-type representation parameters union-of)
@@ -159,14 +160,28 @@
 (define (check-syntax-form expr context)
   (cond
    ((eq? (car expr) 'begin)
-    (if (null? (cdr expr))
-        undefined-type
-        (step-through (cdr expr) context)))
+    (step-through (cdr expr) context))
    (else (error "check-syntax-form" "Not yet implemented" (car expr)))))
 
 (define (step-through exprs context)
-  ;; TODO: step through a list of expressions given a context
-  0)
+  (if (null? exprs)
+      undefined-type
+      (if (null? (cdr exprs))
+          (check-expression (car exprs) context)
+          (let ((next-expression (car exprs)))
+            (step-through (cdr exprs)
+                          (if (and (pair? next-expression)
+                                   (eq? 'define (car next-expression)))
+                              (cond
+                               ((symbol? (cadr next-expression))
+                                (cons (cons (cadr next-expression) (check-expression (list-ref next-expression 2) context))
+                                      context))
+                               ((pair? (cadr next-expression))
+                                ;; TODO: work on syntactic sugar for lambda
+                                (error "step-through" "Syntactic sugar for procedure definitions not yet implemented" next-expression))
+                               (else
+                                (error "step-through" "Invalid define syntax" next-expression)))
+                              context))))))
 
 (define (arguments-match? proc-type args)
   (let ((variadic? (list-ref (type-params proc-type) 3)))
@@ -198,4 +213,9 @@
 
 (define (check-global-expression expr)
   (check-expression expr global-context))
+
+(define (display-type expr)
+  ;; Just for testing purposes
+  (display (type-repr (check-global-expression expr)))
+  (newline))
 
