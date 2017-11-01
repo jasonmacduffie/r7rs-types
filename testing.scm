@@ -11,9 +11,4 @@
 
 (display-type
  '(begin
-    (define x 3)
-    (define y (+ x 3))
-    (define z #\c)
-    (display y)
-    (display x)
-    '(())))
+    (if 100 '(1 3) '(1 3))))

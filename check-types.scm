@@ -20,7 +20,7 @@
   ;;
   ;; All other syntax forms must be pre-expanded in order for type checking
   ;; to work.
-  '(define begin quote lambda if case cond or and let))
+  '(define begin quote lambda if case cond or and let import))
 
 (define (syntax-form? l)
   (if (memq (car l) fundamental-syntax)
@@ -193,10 +193,10 @@
       (let loop ((in (cddr expr))
                  (prev-type (check-quoted-expression (cadr expr))))
         (if (null? in)
-            prev-type
+            (list-of prev-type)
             (if (type=? prev-type (check-quoted-expression (car in)))
                 (loop (cdr in) prev-type)
-                any-type))))))
+                (list-of any-type)))))))
    ((pair? expr)
     (pair-of (check-quoted-expression (car expr))
              (check-quoted-expression (cdr expr))))
