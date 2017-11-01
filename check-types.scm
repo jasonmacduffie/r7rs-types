@@ -71,7 +71,7 @@
 (define (list-of t)
   ;; Note that the list type is disjoint from the pair type.
   ;; This is necessary because we cannot make a union of null and pair.
-  (make-type (string-append "#<list-of (" (type-repr t) ">") (list list-of t)))
+  (make-type (string-append "#<list-of " (type-repr t) ">") (list list-of t)))
 (define (procedure-of input-types output-type variadic?)
   (make-type (string-append "#<procedure: ("
                             (apply string-append
@@ -186,9 +186,9 @@
    ((list? expr)
     (cond
      ((null? expr)
-      any-type)
+      (list-of any-type))
      ((null? (cdr expr))
-      (check-quoted-expression (car expr)))
+      (list-of (check-quoted-expression (car expr))))
      (else
       (let loop ((in (cddr expr))
                  (prev-type (check-quoted-expression (cadr expr))))

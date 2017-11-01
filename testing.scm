@@ -16,4 +16,4 @@
     (define z #\c)
     (display y)
     (display x)
-    '(1)))
+    '(())))
