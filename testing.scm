@@ -12,7 +12,10 @@
 (display-type
  '(begin
     (define l '(1 3 100 -12 3))
-    (let loop ((in l) (i 0))
+    (lambda ()
+      (car l))))
+#|    (let loop ((in l) (i 0))
       (if (null? in)
           i
           (loop (cdr in) (+ i 1))))))
+|#

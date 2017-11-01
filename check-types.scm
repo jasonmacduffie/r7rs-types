@@ -101,7 +101,14 @@
 
 (define global-context
   ;; This has the type signature of built-in functions
-  `((* . ,(procedure-of (list number-type number-type)
+  ;; TODO: fix car and cdr
+  `((car . ,(procedure-of (list any-type)
+                          any-type
+                          #f))
+    (cdr . ,(procedure-of (list any-type)
+                          any-type
+                          #f))
+    (* . ,(procedure-of (list number-type number-type)
                        number-type
                        #t))
     (/ . ,(procedure-of (list number-type number-type)
@@ -160,11 +167,11 @@
     (step-through (cdr expr) context))
    ((eq? (car expr) 'lambda)
     ;; TODO: lambda
-    (procedure-type (list any-type)
-                    (step-through (cddr expr) (append (map (lambda (v) (cons v any-type))
-                                                           (cadr expr))
-                                                      context))
-                    #t))
+    (procedure-of (list any-type)
+                  (step-through (cddr expr) (append (map (lambda (v) (cons v any-type))
+                                                         (cadr expr))
+                                                    context))
+                  #t))
    ((eq? (car expr) 'let)
     (if (list? (cadr expr))
         (check-expression (apply list (apply list 'lambda (map car (cadr expr)) (cddr expr)) (map cadr (cadr expr)))
