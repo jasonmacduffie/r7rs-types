@@ -175,7 +175,9 @@
             (if (not (list-ref expr 3))
                 ;; If return non-boolean or false, it is a "maybe" type
                 (maybe-of expr1-type)
-                any-type))))
+                (if (not (list-ref expr 2))
+                    (maybe-of expr2-type)
+                    any-type)))))
      (else (error "check-syntax-form" "malformed if" expr))))        
    (else (error "check-syntax-form" "Not yet implemented" (car expr)))))
 
