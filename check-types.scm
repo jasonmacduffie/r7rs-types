@@ -90,6 +90,9 @@
                             (type-repr output-type)
                             ">")
              (list procedure-of input-types output-type variadic?)))
+(define (maybe-of t)
+  ;; maybe-of can be of type t, or #f
+  (make-type (string-append "#<maybe-of " (type-repr t) ">") (list maybe-of t)))
 
 (define (procedure-type? t)
   (and (type? t)
@@ -159,6 +162,21 @@
     (if (= (length expr) 2)
         (check-quoted-expression (cadr expr))
         (error "check-syntax-form" "malformed quote" expr)))
+   ((eq? (car expr) 'if)
+    (cond
+     ((= (length expr) 3)
+      ;; If expressions can be anything without an else clause.
+      any-type)
+     ((= (length expr) 4)
+      (let ((expr1-type (check-expression (list-ref expr 2) context))
+            (expr2-type (check-expression (list-ref expr 3) context)))
+        (if (type=? expr1-type expr2-type)
+            expr1-type
+            (if (not (list-ref expr 3))
+                ;; If return non-boolean or false, it is a "maybe" type
+                (maybe-of expr1-type)
+                any-type))))
+     (else (error "check-syntax-form" "malformed if" expr))))        
    (else (error "check-syntax-form" "Not yet implemented" (car expr)))))
 
 (define (check-quoted-expression expr)
