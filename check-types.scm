@@ -161,7 +161,9 @@
    ((eq? (car expr) 'lambda)
     ;; TODO: lambda
     (procedure-type (list any-type)
-                    (step-through (cddr expr) context)
+                    (step-through (cddr expr) (append (map (lambda (v) (cons v any-type))
+                                                           (cadr expr))
+                                                      context))
                     #t))
    ((eq? (car expr) 'let)
     (if (list? (cadr expr))
@@ -232,7 +234,11 @@
                                    (eq? 'define (car next-expression)))
                               (cond
                                ((symbol? (cadr next-expression))
-                                (cons (cons (cadr next-expression) (check-expression (list-ref next-expression 2) context))
+                                (cons (cons (cadr next-expression) (check-expression (list-ref next-expression 2)
+                                                                                     (cons (cons (cadr next-expression)
+                                                                                                 any-type)
+                                                                                           context)))
+                                      ;; TODO: recursive references
                                       context))
                                ((pair? (cadr next-expression))
                                 ;; TODO: work on syntactic sugar for lambda
