@@ -11,4 +11,8 @@
 
 (display-type
  '(begin
-    (if 100 '(1 3) '(1 3))))
+    (define l '(1 3 100 -12 3))
+    (let loop ((in l) (i 0))
+      (if (null? in)
+          i
+          (loop (cdr in) (+ i 1))))))
