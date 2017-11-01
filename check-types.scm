@@ -184,16 +184,19 @@
 (define (check-quoted-expression expr)
   (cond
    ((list? expr)
-    (if (null? expr)
-      any-type
+    (cond
+     ((null? expr)
+      any-type)
+     ((null? (cdr expr))
+      (check-quoted-expression (car expr)))
+     (else
       (let loop ((in (cddr expr))
                  (prev-type (check-quoted-expression (cadr expr))))
         (if (null? in)
             prev-type
             (if (type=? prev-type (check-quoted-expression (car in)))
                 (loop (cdr in) prev-type)
-                any-type)))))
-
+                any-type))))))
    ((pair? expr)
     (pair-of (check-quoted-expression (car expr))
              (check-quoted-expression (cdr expr))))

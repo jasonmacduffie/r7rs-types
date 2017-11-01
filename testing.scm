@@ -16,5 +16,4 @@
     (define z #\c)
     (display y)
     (display x)
-    (if z #f 100)))
-
+    '(1)))
