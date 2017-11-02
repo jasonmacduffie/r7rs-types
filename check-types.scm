@@ -136,14 +136,14 @@
      (else t))))
 
 (define (parametric-output-type fetcher)
-  (lambda (proc)
+  (lambda args
     (cond
-     ((eq? proc 'string-repr)
+     ((eq? (car args) 'string-repr)
       "PARAMETRIC OUTPUT")
-     ((eq? proc 'parametric?)
+     ((eq? (car args) 'parametric?)
       #t)
      (else
-      (fetcher (map type-params (cdr (type-params proc))))))))
+      (fetcher (list-ref args 1))))))
 
 (define (procedure-type? t)
   (and (type? t)
@@ -154,8 +154,8 @@
   ;; This has the type signature of built-in functions
   ;; TODO: fix car and cdr
   `((car . ,(procedure-of (list (parametric-input-type pair-of))
-                          (parametric-output-type (lambda (params)
-                                                    (list-ref params 2)))
+                          (parametric-output-type (lambda (intypes)
+                                                    (caddr (type-params (car intypes)))))
                           #f))
     (cdr . ,(procedure-of (list (parametric-input-type pair-of))
                           (simple-output-type any-type)
@@ -212,6 +212,9 @@
                 (get-proc-output applyer applied)
                 (error "check-list" "Argument type mismatch"))
             (error "check-list" "Non-procedure application" applyer)))))
+
+(define (get-proc-output applyer applied)
+  ((list-ref (type-params applyer) 2) 'bind-input-params applied))
 
 (define (check-syntax-form expr context)
   (cond
@@ -326,7 +329,7 @@
                 #f
                 (if (type=? (if ((car proc-in) 'parametric?)
                                 (if (proc-params-compatible? (car proc-in) (car args-in))
-                                    (proc-params-map (car proc-in) (car args-in))
+                                    any-type
                                     garbage-type)
                                 ((car proc-in)))
                             (car args-in))
