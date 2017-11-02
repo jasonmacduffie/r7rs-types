@@ -35,6 +35,9 @@
   (unless (and (type? a) (type? b))
     (error "type=?" "Both arguments must be types" a b))
   (cond
+   ((or (eq? a garbage-type)
+        (eq? b garbage-type))
+    #f)
    ((or (eq? a any-type)
         (eq? b any-type))
     (warn-any)
@@ -58,6 +61,7 @@
 (define (parameterized-type? t)
   (if (type-params t) #t #f))
 
+(define garbage-type (make-type "#<garbage>" #f)) ;; opposite of any
 (define any-type (make-type "#<any>" #f))
 (define undefined-type (make-type "#<undefined>" #f))
 (define number-type (make-type "#<number>" #f))
@@ -72,27 +76,74 @@
   ;; Note that the list type is disjoint from the pair type.
   ;; This is necessary because we cannot make a union of null and pair.
   (make-type (string-append "#<list-of " (type-repr t) ">") (list list-of t)))
-(define (procedure-of input-types output-type variadic?)
+(define (procedure-of input-types output-type-fetcher variadic?)
   (make-type (string-append "#<procedure: ("
                             (apply string-append
                              (map (lambda (s)
-                                    (string-append (type-repr s)
+                                    (string-append (s 'string-repr)
                                                    " "))
                                   (if variadic?
                                       (reverse (cdr (reverse input-types)))
                                       input-types)))
                             (if variadic?
                                 (string-append " . ("
-                                               (type-repr (car (reverse input-types)))
+                                               ((car (reverse input-types)) 'string-repr)
                                                ")")
                                 "")
                             ") -> "
-                            (type-repr output-type)
+                            (output-type-fetcher 'string-repr)
                             ">")
-             (list procedure-of input-types output-type variadic?)))
+             (list procedure-of input-types output-type-fetcher variadic?)))
 (define (maybe-of t)
   ;; maybe-of can be of type t, or #f
   (make-type (string-append "#<maybe-of " (type-repr t) ">") (list maybe-of t)))
+
+(define (simple-input-type t)
+  (lambda (arg)
+    (cond
+     ((eq? arg 'get-type-func)
+      (lambda ()
+        t))
+     ((eq? arg 'string-repr)
+      (type-repr t))
+     ((eq? arg 'parametric?)
+      #f)
+     (else
+      (error "simple-input-type" "Not understood" arg)))))
+
+(define (parametric-input-type maker)
+  (lambda (arg)
+    (cond
+     ((eq? arg 'get-type-func)
+      (lambda params
+        (apply maker params)))
+     ((eq? arg 'string-repr)
+      "PARAMETRIC INPUT")
+     ((eq? arg 'parametric?)
+      #t)
+     ((eq? arg 'maker)
+      maker)
+     (else
+      (error "parametric-input-type" "Not understood" arg)))))
+
+(define (simple-output-type t)
+  (lambda (proc)
+    (cond
+     ((eq? proc 'string-repr)
+      (type-repr t))
+     ((eq? proc 'parametric?)
+      #f)
+     (else t))))
+
+(define (parametric-output-type fetcher)
+  (lambda (proc)
+    (cond
+     ((eq? proc 'string-repr)
+      "PARAMETRIC OUTPUT")
+     ((eq? proc 'parametric?)
+      #t)
+     (else
+      (fetcher (map type-params (cdr (type-params proc))))))))
 
 (define (procedure-type? t)
   (and (type? t)
@@ -102,23 +153,24 @@
 (define global-context
   ;; This has the type signature of built-in functions
   ;; TODO: fix car and cdr
-  `((car . ,(procedure-of (list any-type)
-                          any-type
+  `((car . ,(procedure-of (list (parametric-input-type pair-of))
+                          (parametric-output-type (lambda (params)
+                                                    (list-ref params 2)))
                           #f))
-    (cdr . ,(procedure-of (list any-type)
-                          any-type
+    (cdr . ,(procedure-of (list (parametric-input-type pair-of))
+                          (simple-output-type any-type)
                           #f))
-    (* . ,(procedure-of (list number-type number-type)
-                       number-type
-                       #t))
-    (/ . ,(procedure-of (list number-type number-type)
-                        number-type
+    (* . ,(procedure-of (list (simple-input-type number-type))
+                        (simple-output-type number-type)
                         #t))
-    (+ . ,(procedure-of (list number-type)
-                        number-type
+    (/ . ,(procedure-of (list (simple-input-type number-type) (simple-input-type number-type))
+                        (simple-output-type number-type)
                         #t))
-    (- . ,(procedure-of (list number-type)
-                        number-type
+    (+ . ,(procedure-of (list (simple-input-type number-type))
+                        (simple-output-type number-type)
+                        #t))
+    (- . ,(procedure-of (list (simple-input-type number-type) (simple-input-type number-type))
+                        (simple-output-type number-type)
                         #t))))
 
 (define (check-expression expr context)
@@ -157,7 +209,7 @@
                           (cdr expr))))
         (if (procedure-type? applyer) ;; TODO: check arguments
             (if (arguments-match? applyer applied)
-                (list-ref (type-params applyer) 2)
+                (get-proc-output applyer applied)
                 (error "check-list" "Argument type mismatch"))
             (error "check-list" "Non-procedure application" applyer)))))
 
@@ -272,15 +324,25 @@
             (or checking-variadic? (null? proc-in))
             (if (null? proc-in)
                 #f
-                (if (type=? (car proc-in) (car args-in))
+                (if (type=? (if ((car proc-in) 'parametric?)
+                                (if (proc-params-compatible? (car proc-in) (car args-in))
+                                    (proc-params-map (car proc-in) (car args-in))
+                                    garbage-type)
+                                ((car proc-in)))
+                            (car args-in))
                     (loop (if checking-variadic?
                               proc-in
                               (cdr proc-in))
                           (cdr args-in))
                       (error "Expected "
-                        (type-repr (car proc-in))
+                        ((car proc-in) 'string-repr)
                         ", but got "
                         (type-repr (car args-in))))))))))
+
+(define (proc-params-compatible? proc-in-type t)
+  (and
+   (parameterized-type? t)
+   (eq? (proc-in-type 'maker) (car (type-params t)))))
 
 (define (check-global-expression expr)
   (check-expression expr global-context))
