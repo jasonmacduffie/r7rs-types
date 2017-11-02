@@ -31,6 +31,40 @@
   (display "Any type was found")
   (newline))
 
+(define (counts-as-a? a b)
+  (cond
+   ((or (eq? a garbage-type)
+        (eq? b garbage-type))
+    #f)
+   ((or (eq? a any-type)
+        (eq? b any-type))
+    #t)
+   ((type=? a b)
+    #t)
+   (else #f)))
+
+(define (param-counts-as-a? p1 p2)
+  (if (eq? p2 pair-of)
+      (or (eq? p1 pair-of)
+          (eq? p1 list-of))
+      (eq? p1 p2)))
+
+(define (type=? a b)
+  (if (parameterized-type? a)
+      (if (parameterized-type? b)
+          (if (eq? (car (type-params a))
+                   (car (type-params b)))
+              (let loop ((a-in (cdr (type-params a)))
+                         (b-in (cdr (type-params b))))
+                (if (null? a-in)
+                    (null? b-in)
+                    (if (type=? (car a-in) (car b-in))
+                        (loop (cdr a-in) (cdr b-in))
+                        #f)))
+              #f)
+          #f))
+  (eq? a b))
+
 (define (type=? a b)
   (unless (and (type? a) (type? b))
     (error "type=?" "Both arguments must be types" a b))
@@ -41,22 +75,7 @@
    ((or (eq? a any-type)
         (eq? b any-type))
     (warn-any)
-    #t)
-   ((parameterized-type? a)
-    (if (parameterized-type? b)
-        (if (eq? (car (type-params a))
-                 (car (type-params b)))
-            (let loop ((a-in (cdr (type-params a)))
-                       (b-in (cdr (type-params b))))
-              (if (null? a-in)
-                  (null? b-in)
-                  (if (type=? (car a-in) (car b-in))
-                      (loop (cdr a-in) (cdr b-in))
-                      #f)))
-            #f)
-        #f))
-   (else
-    (eq? a b))))
+    #t)))
 
 (define (parameterized-type? t)
   (if (type-params t) #t #f))
@@ -155,10 +174,15 @@
   ;; TODO: fix car and cdr
   `((car . ,(procedure-of (list (parametric-input-type pair-of))
                           (parametric-output-type (lambda (intypes)
-                                                    (caddr (type-params (car intypes)))))
+                                                    (cadr (type-params (car intypes)))))
                           #f))
     (cdr . ,(procedure-of (list (parametric-input-type pair-of))
-                          (simple-output-type any-type)
+                          (parametric-output-type (lambda (intypes)
+                                                    (let ((intype-params
+                                                           (type-params (car intypes))))
+                                                      (if (eq? (car intype-params) pair-of)
+                                                          (caddr intype-params)
+                                                          (car intypes)))))
                           #f))
     (* . ,(procedure-of (list (simple-input-type number-type))
                         (simple-output-type number-type)
@@ -327,25 +351,29 @@
             (or checking-variadic? (null? proc-in))
             (if (null? proc-in)
                 #f
-                (if (type=? (if ((car proc-in) 'parametric?)
-                                (if (proc-params-compatible? (car proc-in) (car args-in))
-                                    any-type
-                                    garbage-type)
-                                ((car proc-in)))
-                            (car args-in))
+                (if (counts-as-a? (car args-in)
+                                  (if ((car proc-in) 'parametric?)
+                                      (if (proc-params-compatible?
+                                           (car proc-in)
+                                           (car args-in))
+                                          any-type
+                                          garbage-type)
+                                      ((car proc-in))))
                     (loop (if checking-variadic?
                               proc-in
                               (cdr proc-in))
                           (cdr args-in))
-                      (error "Expected "
-                        ((car proc-in) 'string-repr)
-                        ", but got "
-                        (type-repr (car args-in))))))))))
+                    (error "Expected "
+                      ((car proc-in) 'string-repr)
+                      ", but got "
+                      (type-repr (car args-in))))))))))
 
 (define (proc-params-compatible? proc-in-type t)
-  (and
-   (parameterized-type? t)
-   (eq? (proc-in-type 'maker) (car (type-params t)))))
+  (or
+   (eq? proc-in-type any-type)
+   (and
+    (parameterized-type? t)
+    (param-counts-as-a? (car (type-params t)) (proc-in-type 'maker)))))
 
 (define (check-global-expression expr)
   (check-expression expr global-context))
