@@ -13,8 +13,8 @@
  '(begin
     (define x '(1 3 100 -12 3))
     (lambda ()
-      (car x))
-    (let loop ((in x) (i 0))
-      (if (null? in)
-          i
-          (loop (cdr in) (+ i 1))))))
+      (car x))))
+;    (let loop ((in x) (i 0))
+;      (if (null? in)
+;          i
+;          (loop (cdr in) (+ i 1))))))

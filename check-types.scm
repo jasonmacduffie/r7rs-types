@@ -243,10 +243,13 @@
             (applied (map (lambda (e) (check-expression e context))
                           (cdr expr))))
         (if (procedure-type? applyer) ;; TODO: check arguments
-            (if (arguments-match? applyer applied)
-                (get-proc-output applyer applied)
-                (error "check-list" "Argument type mismatch"))
-            (error "check-list" "Non-procedure application" applyer)))))
+            (let ((argument-warning-message (argument-warning applyer applied)))
+              (if argument-warning-message
+                  (begin
+                    (display argument-warning-message)
+                    any-type)
+                  (get-proc-output applyer applied))
+            (error "check-list" "Non-procedure application" applyer))))))
 
 (define (get-proc-output applyer applied)
   ((list-ref (type-params applyer) 2) 'bind-input-params applied))
@@ -257,11 +260,12 @@
     (step-through (cdr expr) context))
    ((eq? (car expr) 'lambda)
     ;; TODO: lambda
-    (procedure-of (list (simple-input-type any-type))
-                  (simple-output-type (step-through (cddr expr) (append (map (lambda (v) (cons v any-type))
-                                                         (cadr expr))
-                                                    context)))
-                  #t))
+    (procedure-of (list (simple-input-type any-type)) (simple-output-type any-type) #t))
+;;                  (simple-output-type (step-through (cddr expr)
+;;                                                    (append (map (lambda (v) (cons v (procedure-of (list (simple-input-type any-type)) (simple-output-type any-type) #t)))
+;;                                                                 (cadr expr))
+;;                                                            context)))
+;;                  #t))
    ((eq? (car expr) 'let)
     (if (list? (cadr expr))
         (check-expression (apply list (apply list 'lambda (map car (cadr expr)) (cddr expr)) (map cadr (cadr expr)))
@@ -344,40 +348,37 @@
                                 (error "step-through" "Invalid define syntax" next-expression)))
                               context))))))
 
-(define (arguments-match? proc-type args)
-  (let ((variadic? (list-ref (type-params proc-type) 3)))
-    (let ((proc-size (length (list-ref (type-params proc-type) 1)))
-          (args-size (length args)))
-      (when (and variadic?
-                 (> (- proc-size 1) args-size))
-        (error "arguments-match?" "Expected at least "
-               (- proc-size 1) " arguments, got " args-size))
-      (unless (or variadic? (= proc-size args-size))
-        (error "arguments-match?" "Expected " proc-size
-               "arguments, got " args-size)))
-    (let loop ((proc-in (list-ref (type-params proc-type) 1))
-               (args-in args))
-      (let ((checking-variadic? (and variadic? (= (length proc-in) 1))))
-        (if (null? args-in)
-            (or checking-variadic? (null? proc-in))
-            (if (null? proc-in)
-                #f
-                (if (counts-as-a? (car args-in)
-                                  (if ((car proc-in) 'parametric?)
-                                      (if (proc-params-compatible?
-                                           (car proc-in)
-                                           (car args-in))
-                                          any-type
-                                          garbage-type)
-                                      ((car proc-in))))
-                    (loop (if checking-variadic?
-                              proc-in
-                              (cdr proc-in))
-                          (cdr args-in))
-                    (error "Expected "
-                      ((car proc-in) 'string-repr)
-                      ", but got "
-                      (type-repr (car args-in))))))))))
+(define (argument-warning proc-type args)
+  (display proc-type) (newline) (newline)
+  (let ((variadic? (list-ref (type-params proc-type) 3))
+        (proc-size (length (list-ref (type-params proc-type) 1)))
+        (args-size (length args)))
+    (cond
+     ((and variadic? (> (- proc-size 1) args-size))
+      (string-append "Expected at least " (number->string (- proc-size 1)) " arguments, but got " (number->string args-size)))
+     ((and (not variadic?)
+           (not (= proc-size args-size)))
+      (string-append "Expected " (number->string proc-size) " arguments, but got " (number->string args-size)))
+     (else
+      (let loop
+          ((proc-in (list-ref (type-params proc-type) 1))
+           (args-in args))
+        (let ((checking-variadic? (and variadic? (= (length proc-in) 1))))
+          (if (null? args-in)
+              (not (or checking-variadic? (null? proc-in)))
+              (if (counts-as-a? (car args-in)
+                                (if ((car proc-in) 'parametric?)
+                                    (if (proc-params-compatible?
+                                         (car proc-in)
+                                         (car args-in))
+                                        any-type
+                                        garbage-type)
+                                    ((car proc-in))))
+                  (loop (if checking-variadic?
+                            proc-in
+                            (cdr proc-in))
+                        (cdr args-in))
+                  (string-append "Expected " ((car proc-in) 'string-repr) ", but got " (type-repr (car args-in)))))))))))
 
 (define (proc-params-compatible? proc-in-type t)
   (or
