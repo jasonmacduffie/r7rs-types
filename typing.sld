@@ -12,6 +12,13 @@
   ;; are supported, so anonymous functions may be assumed to accept
   ;; and return types <any>.
   ;;
+  ;; Types being supported:
+  ;; <any> <vector> <list> <number> <real> <complex> <rational>
+  ;; <boolean> ... (WIP)
+  ;;
+  ;; Procedures have their own type forms:
+  ;; (-> <input type> ... <output type>)
+  ;;
   ;; EXAMPLE USAGE, based on a Typed Racket example:
   ;;
   ;; (|:| point (-> <real> <real> <point>))
