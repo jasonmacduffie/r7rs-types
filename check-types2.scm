@@ -63,6 +63,12 @@
     (cond
      ((eq? arg 'is-list?)
       #t)
+     ((eq? arg 'type)
+      t)
+     ((eq? arg 'type-predicate)
+      'is-list?)
+     ((eq? arg 'parametric?)
+      #t)
      ((eq? arg 'type-predicate)
       'is-list?)
      (else
@@ -77,6 +83,8 @@
       t1)
      ((eq? arg 'cdr-type)
       t2)
+     ((eq? arg 'parametric?)
+      #t)
      ((eq? arg 'type-predicate)
       'is-pair?)
      ((eq? arg 'set-car-to!)
@@ -93,6 +101,8 @@
       #t)
      ((eq? arg 'type)
       t)
+     ((eq? arg 'parametric?)
+      #t)
      ((eq? arg 'type-predicate)
       'is-vector?)
      (else
@@ -139,6 +149,8 @@
   (lambda (arg)
     (cond
      ((eq? arg 'is-maybe?)
+      #t)
+     ((eq? arg 'parametric?)
       #t)
      ((eq? arg 'type-predicate)
       'is-maybe?)
@@ -208,8 +220,11 @@
     #f)))
 
 ;;; Predicates
-(define (pair-type? t)
-  (t 'is-pair?))
+(define (any-type? t)
+  (t 'any-type?))
+
+(define (none-type? t)
+  (t 'none-type?))
 
 (define (null-type? t)
   (t 'is-null?))
@@ -217,8 +232,41 @@
 (define (list-type? t)
   (t 'is-list?))
 
-(define (any-type? t)
-  (t 'any-type?))
+(define (pair-type? t)
+  (t 'is-pair?))
+
+(define (vector-type? t)
+  (t 'is-vector?))
+
+(define (boolean-type? t)
+  (t 'is-boolean?))
+
+(define (maybe-type? t)
+  (t 'is-maybe?))
+
+(define (bytevector-type? t)
+  (t 'is-bytevector?))
+
+(define (eof-object-type? t)
+  (t 'is-eof-object?))
+
+(define (number-type? t)
+  (t 'is-number?))
+
+(define (port-type? t)
+  (t 'is-port?))
+
+(define (string-type? t)
+  (t 'is-string?))
+
+(define (symbol-type? t)
+  (t 'is-symbol?))
+
+(define (procedure-type? t)
+  (t 'is-procedure?))
+
+(define (parametric? t)
+  (t 'parametric?))
 
 ;;; De-parameterization
 (define (type-car t)
@@ -241,6 +289,7 @@
 ;;(list-of <number>)
 ;;(pair-of <symbol> <any>)
 ;;(vector-of <number>)
+;;(maybe-of (pair-of <symbol> <any>))
 ;;(-> (<number> <number> <string>))
 |#
 
@@ -249,7 +298,25 @@
   (if (or (any-type? type-of-expr)
           (any-type? type-of-var))
       #t
-      (type-of-var (type-of-expr 'type-predicate))))
+      (if (parametric? type-of-var)
+          (cond
+           ((maybe-type? type-of-var)
+            (type-of-var (type-of-expr 'type-predicate)))
+           ((list-type? type-of-var)
+            (and (type-of-var (type-of-expr 'type-predicate))
+                 (counts-as-a (type-of-expr 'type)
+                              (type-of-var 'type))))
+           ((pair-type? type-of-var)
+            (and (type-of-var (type-of-expr 'type-predicate))
+                 (counts-as-a (type-of-expr 'car-type)
+                              (type-of-var 'car-type))
+                 (counts-as-a (type-of-expr 'cdr-type)
+                              (type-of-var 'cdr-type))))
+           (else
+            (and (type-of-var (type-of-expr 'type-predicate))
+                 (counts-as-a (type-of-expr 'type)
+                              (type-of-var 'type)))))
+          (type-of-var (type-of-expr 'type-predicate)))))
 
 (define (read-type expr)
   ;; Read a type annotation
