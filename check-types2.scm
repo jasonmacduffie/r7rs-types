@@ -219,6 +219,26 @@
    (else
     #f)))
 
+(define (procedure-of input-types output-type variadic?)
+  (lambda (arg)
+    (cond
+     ((eq? arg 'acceptable-inputs?)
+      (lambda (arg-list)
+        ;; TODO: implement procedure argument checking
+        #t))
+     ((eq? arg 'is-procedure?)
+      #t)
+     ((eq? arg 'type-predicate)
+      'is-procedure?)
+     ((eq? arg 'parametric?)
+      #t)
+     ((eq? arg 'input-types)
+      (cons variadic? input-types))
+     ((eq? arg 'output-type)
+      output-types)
+     (else
+      #f))))
+
 ;;; Predicates
 (define (any-type? t)
   (t 'any-type?))
@@ -322,7 +342,21 @@
   ;; Read a type annotation
   (if (pair? expr)
       ;; If a pair, then it is a parameterized or a procedure
-      (display "next 4")
+      (cond
+       ((eq? (car expr) '|->|)
+        (apply |->| (cdr expr)))
+       ((eq? (car expr) 'list-of)
+        (apply list-of (map read-type (cdr expr))))
+       ((eq? (car expr) 'vector-of)
+        (apply vector-of (map read-type (cdr expr))))
+       ((eq? (car expr) 'pair-of)
+        (apply pair-of (map read-type (cdr expr))))
+       (else
+        ;; Otherwise, display a warning and return any-type
+        (display "WARNING: Unknown type annotation: ")
+        (display expr)
+        (newline)
+        any-type))
       (cond
        ((eq? expr '<boolean>)
         boolean-type)
